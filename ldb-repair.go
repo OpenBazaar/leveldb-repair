@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/btcsuite/goleveldb/leveldb"
-	"github.com/btcsuite/goleveldb/leveldb/errors"
-	ldbopts "github.com/btcsuite/goleveldb/leveldb/opts"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/errors"
+	ldbopt "github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-var options struct {
+type options struct {
 	LevelDBPath string `short:"d" long:"datastore-path" description:"full or relative path to the root of the levelDB datastore"`
 }
 
@@ -28,17 +28,19 @@ func main() {
 		}
 	}
 
-	db, err := leveldb.OpenFile(opts.LevelDBPath, &ldbopts.Options{})
-	if err != nil && errors.IsCorrupted(err) && !nopts.GetReadOnly() {
-		db, recoverErr = leveldb.RecoverFile(opts.LevelDBPath, &ldbopts.Options{})
+	fmt.Printf("opening %s...", opts.LevelDBPath)
+	db, err := leveldb.OpenFile(opts.LevelDBPath, &ldbopt.Options{})
+	if err != nil && errors.IsCorrupted(err) {
+		db, recoverErr := leveldb.RecoverFile(opts.LevelDBPath, &ldbopt.Options{})
 		if recoverErr != nil {
-			fmt.Printf("failed during recovery: %s\n", recoverErr)
+			fmt.Printf("recovering: %s\n", recoverErr)
 			os.Exit(2)
 		}
 		defer db.Close()
-		fmt.Println("recovery completed")
+		fmt.Println("recovery complete")
 		os.Exit(0)
 	}
-	fmt.Println("datastore opened successfully, recovery skipped")
+	defer db.Close()
+	fmt.Println("opened but not corrupted: recovery skipped")
 	os.Exit(0)
 }
